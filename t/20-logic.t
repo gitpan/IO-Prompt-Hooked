@@ -115,13 +115,13 @@ is( prompt( message => 'Hello world.' ),
 
 # Test escape mechanism.
 
-$TEST_INPUT = "\t";
+$TEST_INPUT = "escape";
 is(
     prompt(
         message  => 'Hello',
         default  => 'world',
         validate => sub { 0 },
-        escape   => sub { $_[0] =~ qr/\t/ },
+        escape   => sub { $_[0] =~ qr/\bescape\b/ },
     ),
     undef,
     'Escape bypasses validation and returns undef.'
@@ -161,6 +161,32 @@ is(
     is( $test_tries, 1, 'Error may break out of loop.' );
 }
 
+# Test tries == 0.
+
+$TEST_INPUT = 'no';
+is( 
+  prompt( 
+    message  => 'hello', 
+    validate => qr/^y/, 
+    error    => '', 
+    tries    => undef,
+  ),
+  undef,
+  "Tries==undef should return undef."
+);
+
+# Test no validation, with error set. (should have no impact).
+
+is(
+  prompt(
+    message  => 'hello',
+    error    => undef,
+    tries    => 1,
+  ),
+  'no',
+  'No validation, and error response set. (no impact)'
+);
+
 # Test hashref params.
 
 $TEST_INPUT = 'yes';
@@ -182,7 +208,7 @@ is( prompt( { message => 'hello', validate => qr/^n/i, tries => 0 } ),
         prompt(
             message  => 'hello',
             validate => qr/^n/i,
-            error    => '#test error',
+            error    => "# Test error. (shouldn't see)\n",
             tries    => 2
         ),
         undef,
@@ -196,7 +222,7 @@ is(
     prompt(
         message  => 'hello',
         validate => qr/^n/i,
-        error    => "#test error (expected)\n",
+        error    => "# Test error (expected, ok)\n",
         tries    => 1
     ),
     undef,
@@ -205,7 +231,7 @@ is(
 
 {
     no warnings 'redefine';
-    local *IO::Prompt::Tiny::_is_interactive = sub { 0 };
+    local *IO::Prompt::Hooked::_is_interactive = sub { 0 };
     is(
         prompt(
             validate => qr/^n/,
@@ -213,9 +239,55 @@ is(
             tries    => 1,
         ),
         undef,
-        "Shouldn't print when non-interactive"
+        "Shouldn't print when non-interactive (_is_interactive())."
     );
 }
+
+{
+    local $ENV{PERL_MM_USE_DEFAULT} = 1;
+    no warnings 'redefine';
+    local *IO::Prompt::Hooked::_is_interactive = sub { 0 };
+    is(
+		prompt(
+			validate => qr /^n/,
+			error    => "Test error (shouldn't see)\n",
+			tries    => 1,
+		),
+		undef,
+		"Shouldn't print when non-interactive (_is_interactive & ENV)."
+	);
+}
+
+{
+  local $ENV{PERL_MM_USE_DEFAULT} = 1;
+  no warnings 'redefine';
+  local *IO::Prompt::Hooked::_is_interactive = sub {1};
+  is(
+	prompt( 
+	  validate => qr/^n/,
+	  error    => "Test error (shouldn't see)\n",
+	  tries    => 1,
+    ),
+    undef,
+	"PERL_MM_USE_DEFAULT=1, _is_interactive()==true, shouldn't print."
+  );
+}
+
+{
+    local $ENV{PERL_MM_USE_DEFAULT} = 0;
+    no warnings 'redefine';
+    local *IO::Prompt::Hooked::_is_interactive = sub {1};
+    is(
+		prompt(
+			validate => qr /^n/,
+			error    => "# Test error (expected).\n",
+			tries    => 1,
+		),
+		undef,
+		"Generate a printing test error."
+	);
+}
+
 
 # Test escape sequence as regex.
 
@@ -401,7 +473,7 @@ subtest 'POD subroutine examples' => sub {
         default  => 'y',
         validate => qr/^[yn]$/i,
         tries    => 5,
-        error    => "#Invalid input.(expected)\n"
+        error    => "# Invalid input.(expected, ok)\n"
     );
     is( $input, undef, 'tries example rejects bad input, and "tries" out.' );
 
@@ -412,7 +484,7 @@ subtest 'POD subroutine examples' => sub {
         default  => 'y',
         validate => qr/^[yn]$/i,
         tries    => 5,
-        error    => "#Invalid input.(expected)\n"
+        error    => "# Invalid input.(expected, ok)\n"
     );
     is( $input, 'y', 'tries example passes good input.' );
 
@@ -429,7 +501,7 @@ subtest 'POD subroutine examples' => sub {
               if $raw =~ qr/^[IVXLCDM]+$/i;
             return 'Age must be specified in base-10.'
               if $raw =~ qr/^\p{Hex}$/;
-            return "#Invalid input.(expected)\n";
+            return "# Invalid input.(expected, ok)\n";
         }
     );
     is( $input, undef, 'error example rejects bad input, invoking error cb.' );
