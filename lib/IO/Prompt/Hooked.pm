@@ -7,7 +7,7 @@ use warnings;
 use Params::Smart;
 use IO::Prompt::Tiny ();
 
-our $VERSION = '0.08';
+our $VERSION = '0.10';
 
 use parent 'Exporter';
 
@@ -175,9 +175,9 @@ IO::Prompt::Hooked - Simple prompting with validation hooks.
       tries    => 5,
       error    => sub {
         my( $raw, $tries ) = @_;
-        if( $raw !~ m/^[yn]/ && $tries < 3 ) {
+        if( $raw !~ m/^[yn]/ && $tries > 3 ) {
           print "You're not reading the instructions!  Input terminated\n";
-          IO::Prompt::Hooked::terminate_input();
+          IO::Prompt::Hooked::terminate_input(); # Think 'last', but dirtier.
         }
         return "Must enter a single character, 'y' or 'n'";
       },
@@ -224,7 +224,7 @@ C<terminate_input()> helper.
       tries    => 5,
       validate => sub {
         my $raw = shift;
-        return $raw =~ /^[0-9]+$/ && $raw >= 0 && $raw <= 255;
+        return $raw =~ m/^[0-9]+$/ && $raw >= 0 && $raw <= 255;
       },
       escape   => qr/^A$/i,
       error    => sub {
@@ -327,9 +327,9 @@ limit is imposed.
                      error    => sub {
                        my( $raw, $tries ) = @_;
                        return 'Roman numerals not allowed'
-                         if $raw =~ qr/^[IVXLCDM]+$/i;
+                         if $raw =~ m/^[IVXLCDM]+$/i;
                        return 'Age must be specified in base-10.'
-                         if $raw =~ qr/^\p{Hex}$/;
+                         if $raw =~ m/[A-Fa-f]/;
                        return 'Invalid input.'
                      } );
 
